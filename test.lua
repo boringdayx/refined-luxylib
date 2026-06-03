@@ -1437,7 +1437,20 @@ end)
 			BindButton.Position = UDim2.new(1, -10, 0.5, 0)
 			BindButton.AutoButtonColor = false
 			BindButton.BackgroundTransparency = 0.5
-			BindButton.Text = (CurrentKey ~= Enum.KeyCode.Unknown) and CurrentKey.Name or "None"
+			local function GetKeyName(k)
+				if not k or k == Enum.KeyCode.Unknown then return "None" end
+				if typeof(k) == "EnumItem" then
+					if k.EnumType == Enum.UserInputType then
+						if k == Enum.UserInputType.MouseButton1 then return "Mouse1" end
+						if k == Enum.UserInputType.MouseButton2 then return "Mouse2" end
+						if k == Enum.UserInputType.MouseButton3 then return "Mouse3" end
+					end
+					return k.Name
+				end
+				return "None"
+			end
+
+			BindButton.Text = GetKeyName(CurrentKey)
 			BindButton.Font = Enum.Font.GothamBold
 			BindButton.TextSize = 11
 			Instance.new("UICorner", BindButton).CornerRadius = UDim.new(0, 6)
@@ -1479,7 +1492,7 @@ end)
 			end
 
 			local function RefreshButtonText()
-				BindButton.Text = (CurrentKey ~= Enum.KeyCode.Unknown) and CurrentKey.Name or "None"
+				BindButton.Text = GetKeyName(CurrentKey)
 			end
 
 			local function UpdateStrokesVisual(isListening, themeName)
@@ -1554,18 +1567,25 @@ end)
 				):Play()
 
 				local conn
-				conn = UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-					if gameProcessedEvent then return end
-					if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-					if input.KeyCode == Enum.KeyCode.Escape then
+				conn = UserInputService.InputBegan:Connect(function(input, _gameProcessedEvent)
+					local inputType = input.UserInputType
+					local isKeyboard = inputType == Enum.UserInputType.Keyboard
+					local isMouse = inputType == Enum.UserInputType.MouseButton1
+						or inputType == Enum.UserInputType.MouseButton2
+						or inputType == Enum.UserInputType.MouseButton3
+
+					if isKeyboard and input.KeyCode == Enum.KeyCode.Escape then
 						Listening = false
 						if conn then conn:Disconnect() end
 						RefreshButtonText()
 						UpdateStrokesVisual(false)
 						return
 					end
+
+					if not (isKeyboard or isMouse) then return end
+
 					Listening = false
-					CurrentKey = input.KeyCode
+					CurrentKey = isKeyboard and input.KeyCode or inputType
 					if conn then conn:Disconnect() end
 					RefreshButtonText()
 					UpdateStrokesVisual(false)
@@ -1573,12 +1593,16 @@ end)
 				end)
 			end)
 
-			UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-				if gameProcessedEvent then return end
+			UserInputService.InputBegan:Connect(function(input, _gameProcessedEvent)
 				if Listening then return end
-				if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-				if CurrentKey == Enum.KeyCode.Unknown then return end
-				if input.KeyCode == CurrentKey then
+				if not CurrentKey or CurrentKey == Enum.KeyCode.Unknown then return end
+				local inputType = input.UserInputType
+				if inputType == Enum.UserInputType.Keyboard then
+					if input.KeyCode == CurrentKey then
+						CallbackFunc()
+					end
+				elseif inputType == CurrentKey then
+					-- Mouse button match (CurrentKey was set to a UserInputType during rebind)
 					CallbackFunc()
 				end
 			end)
