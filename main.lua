@@ -1413,6 +1413,215 @@ end)
 			end)
 		end
 
+		function Tab:CreateKeybind(KeybindName, Description, DefaultKey, Callback)
+			local CallbackFunc = Callback or function() end
+			local HasDesc = type(Description) == "string" and Description ~= ""
+			local CurrentKey = DefaultKey or Enum.KeyCode.Unknown
+			local Listening = false
+
+			local Container = Instance.new("Frame", Page)
+			Container.Size = UDim2.new(1, 0, 0, HasDesc and 52 or 36)
+			Container.BackgroundTransparency = 0.55
+			Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 8)
+			luxylib:ApplyThemeObj(Container, "BackgroundColor3", "ToggleBtnBg")
+
+			local ContainerStroke = Instance.new("UIStroke", Container)
+			ContainerStroke.Thickness = 1
+			ContainerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			ContainerStroke.Color = luxylib.Themes[luxylib.CurrentTheme].Stroke
+			ContainerStroke.Transparency = 0.85
+
+			local BindButton = Instance.new("TextButton", Container)
+			BindButton.Size = UDim2.new(0, 70, 0, 24)
+			BindButton.AnchorPoint = Vector2.new(1, 0.5)
+			BindButton.Position = UDim2.new(1, -10, 0.5, 0)
+			BindButton.AutoButtonColor = false
+			BindButton.BackgroundTransparency = 0.5
+			local function GetKeyName(k)
+				if not k or k == Enum.KeyCode.Unknown then return "None" end
+				if typeof(k) == "EnumItem" then
+					if k.EnumType == Enum.UserInputType then
+						if k == Enum.UserInputType.MouseButton1 then return "Mouse1" end
+						if k == Enum.UserInputType.MouseButton2 then return "Mouse2" end
+						if k == Enum.UserInputType.MouseButton3 then return "Mouse3" end
+					end
+					return k.Name
+				end
+				return "None"
+			end
+
+			BindButton.Text = GetKeyName(CurrentKey)
+			BindButton.Font = Enum.Font.GothamBold
+			BindButton.TextSize = 11
+			Instance.new("UICorner", BindButton).CornerRadius = UDim.new(0, 6)
+			luxylib:ApplyThemeObj(BindButton, "BackgroundColor3", "ToggleBgOff")
+			luxylib:ApplyThemeObj(BindButton, "TextColor3", "Text")
+
+			local BindStroke = Instance.new("UIStroke", BindButton)
+			BindStroke.Thickness = 1
+			BindStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			BindStroke.Color = luxylib.Themes[luxylib.CurrentTheme].Stroke
+			BindStroke.Transparency = 0.7
+
+			local Title = Instance.new("TextLabel", Container)
+			Title.Size = UDim2.new(1, -100, 0, 16)
+			Title.Position = UDim2.new(0, 15, 0, 10)
+			if not HasDesc then
+				Title.Size = UDim2.new(1, -100, 1, 0)
+				Title.Position = UDim2.new(0, 15, 0, 0)
+			end
+			Title.BackgroundTransparency = 1
+			Title.Text = KeybindName
+			Title.Font = Enum.Font.GothamMedium
+			Title.TextSize = 13
+			Title.TextXAlignment = Enum.TextXAlignment.Left
+			Title.TextTruncate = Enum.TextTruncate.AtEnd
+			luxylib:ApplyThemeObj(Title, "TextColor3", "Text")
+
+			if HasDesc then
+				local DescLabel = Instance.new("TextLabel", Container)
+				DescLabel.Size = UDim2.new(1, -100, 0, 14)
+				DescLabel.Position = UDim2.new(0, 15, 0, 26)
+				DescLabel.BackgroundTransparency = 1
+				DescLabel.Text = Description
+				DescLabel.Font = Enum.Font.Gotham
+				DescLabel.TextSize = 11
+				DescLabel.TextXAlignment = Enum.TextXAlignment.Left
+				DescLabel.TextTruncate = Enum.TextTruncate.AtEnd
+				luxylib:ApplyThemeObj(DescLabel, "TextColor3", "TextInactive")
+			end
+
+			local function RefreshButtonText()
+				BindButton.Text = GetKeyName(CurrentKey)
+			end
+
+			local function UpdateStrokesVisual(isListening, themeName)
+				local palette = luxylib.Themes[themeName or luxylib.CurrentTheme]
+				if isListening then
+					TweenService:Create(
+						ContainerStroke,
+						TweenInfo.new(0.3, Enum.EasingStyle.Quint),
+						{ Color = palette.Accent, Transparency = 0.85 }
+					):Play()
+					TweenService:Create(
+						BindStroke,
+						TweenInfo.new(0.3, Enum.EasingStyle.Quint),
+						{ Color = palette.Accent, Transparency = 0.3 }
+					):Play()
+				else
+					TweenService:Create(
+						ContainerStroke,
+						TweenInfo.new(0.3, Enum.EasingStyle.Quint),
+						{ Color = palette.Stroke, Transparency = 0.85 }
+					):Play()
+					TweenService:Create(
+						BindStroke,
+						TweenInfo.new(0.3, Enum.EasingStyle.Quint),
+						{ Color = palette.Stroke, Transparency = 0.7 }
+					):Play()
+				end
+			end
+
+			UpdateStrokesVisual(false, luxylib.CurrentTheme)
+			table.insert(luxylib.ThemeChangedHooks, {
+				Inst = Container,
+				Func = function(tName)
+					UpdateStrokesVisual(Listening, tName)
+				end,
+			})
+
+			BindButton.MouseEnter:Connect(function()
+				if Listening then return end
+				local palette = luxylib.Themes[luxylib.CurrentTheme]
+				TweenService:Create(
+					BindStroke,
+					TweenInfo.new(0.2, Enum.EasingStyle.Sine),
+					{ Color = palette.Accent, Transparency = 0.4 }
+				):Play()
+			end)
+
+			BindButton.MouseLeave:Connect(function()
+				if Listening then return end
+				local palette = luxylib.Themes[luxylib.CurrentTheme]
+				TweenService:Create(
+					BindStroke,
+					TweenInfo.new(0.2, Enum.EasingStyle.Sine),
+					{ Color = palette.Stroke, Transparency = 0.7 }
+				):Play()
+			end)
+
+			BindButton.MouseButton1Click:Connect(function()
+				if Listening then return end
+				Listening = true
+				BindButton.Text = "..."
+				local palette = luxylib.Themes[luxylib.CurrentTheme]
+				TweenService:Create(
+					ContainerStroke,
+					TweenInfo.new(0.3, Enum.EasingStyle.Quint),
+					{ Color = palette.Accent, Transparency = 0.85 }
+				):Play()
+				TweenService:Create(
+					BindStroke,
+					TweenInfo.new(0.3, Enum.EasingStyle.Quint),
+					{ Color = palette.Accent, Transparency = 0.3 }
+				):Play()
+
+				local conn
+				conn = UserInputService.InputBegan:Connect(function(input, _gameProcessedEvent)
+					local inputType = input.UserInputType
+					local isKeyboard = inputType == Enum.UserInputType.Keyboard
+					local isMouse = inputType == Enum.UserInputType.MouseButton1
+						or inputType == Enum.UserInputType.MouseButton2
+						or inputType == Enum.UserInputType.MouseButton3
+
+					if isKeyboard and input.KeyCode == Enum.KeyCode.Escape then
+						Listening = false
+						if conn then conn:Disconnect() end
+						RefreshButtonText()
+						UpdateStrokesVisual(false)
+						return
+					end
+
+					if not (isKeyboard or isMouse) then return end
+
+					Listening = false
+					CurrentKey = isKeyboard and input.KeyCode or inputType
+					if conn then conn:Disconnect() end
+					RefreshButtonText()
+					UpdateStrokesVisual(false)
+					CallbackFunc(CurrentKey)
+				end)
+			end)
+
+			UserInputService.InputBegan:Connect(function(input, _gameProcessedEvent)
+				if Listening then return end
+				if not CurrentKey or CurrentKey == Enum.KeyCode.Unknown then return end
+				local inputType = input.UserInputType
+				if inputType == Enum.UserInputType.Keyboard then
+					if input.KeyCode == CurrentKey then
+						CallbackFunc()
+					end
+				elseif inputType == CurrentKey then
+					-- Mouse button match (CurrentKey was set to a UserInputType during rebind)
+					CallbackFunc()
+				end
+			end)
+
+			local KeybindObj = {}
+
+			function KeybindObj:Set(newKey)
+				CurrentKey = newKey
+				RefreshButtonText()
+				CallbackFunc(CurrentKey)
+			end
+
+			function KeybindObj:Get()
+				return CurrentKey
+			end
+
+			return KeybindObj
+		end
+
 		function Tab:CreateButton(ButtonName, Description, IconID, Callback)
 			local CallbackFunc = Callback or function() end
 			local HasDesc = type(Description) == "string" and Description ~= ""
